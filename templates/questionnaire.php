@@ -1,3 +1,9 @@
+<!-- Honeypot trap — visually hidden, bots fill it, humans don't -->
+<div class="bsq-hp" aria-hidden="true">
+  <label for="bsq-hp-field">Leave this blank</label>
+  <input type="text" id="bsq-hp-field" name="website" value="" tabindex="-1" autocomplete="off" />
+</div>
+
 <div id="bsq-wrap" role="main">
 
   <!-- ── Header ── -->
@@ -142,7 +148,7 @@
           </div>
         </div>
 
-        <div class="bsq-question">
+        <div class="bsq-question bsq-conditional" data-show-if-q2="yes" style="display:none">
           <p class="bsq-q-label">Has your snoring ever bothered other people? <span class="req">*</span></p>
           <div class="bsq-options bsq-options--2col" data-name="q5">
             <label class="bsq-option"><input type="radio" name="q5" value="yes" /><span>Yes</span></label>

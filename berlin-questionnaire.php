@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Berlin Sleep Apnea Questionnaire
  * Description: Multi-step Berlin Questionnaire with scoring, results, and GoHighLevel webhook integration.
- * Version:     1.0.2
+ * Version:     1.0.3
  * Plugin URI:  https://upwork.com/freelancers/adelsherif8
  * Author:      Adel Emad
  * Author URI:  https://upwork.com/freelancers/adelsherif8
@@ -12,9 +12,20 @@
 
 defined('ABSPATH') || exit;
 
-define('BSQ_VERSION', '1.0.2');
+define('BSQ_VERSION', '1.0.3');
 define('BSQ_DIR',     plugin_dir_path(__FILE__));
 define('BSQ_URL',     plugin_dir_url(__FILE__));
+
+/* ─── Colour helper ───────────────────────────────────── */
+
+function bsq_primary_css(string $hex): string {
+    $hex = ltrim($hex, '#');
+    if (strlen($hex) !== 6) $hex = '2d6a5a';
+    [$r, $g, $b] = [hexdec(substr($hex,0,2)), hexdec(substr($hex,2,2)), hexdec(substr($hex,4,2))];
+    $dark  = sprintf('#%02x%02x%02x', max(0,(int)($r*.80)), max(0,(int)($g*.80)), max(0,(int)($b*.80)));
+    $light = "rgba($r,$g,$b,0.10)";
+    return "--bsq-primary:#{$hex};--bsq-primary-dark:{$dark};--bsq-primary-light:{$light}";
+}
 
 /* ─── Admin Settings ──────────────────────────────────── */
 
@@ -60,6 +71,7 @@ function bsq_render_settings() {
         update_option('bsq_ghl_api_key',     sanitize_text_field($_POST['bsq_ghl_api_key']     ?? ''));
         update_option('bsq_ghl_location_id', sanitize_text_field($_POST['bsq_ghl_location_id'] ?? ''));
         update_option('bsq_booking_url',     sanitize_text_field($_POST['bsq_booking_url']     ?? '/booking-method'));
+        update_option('bsq_primary_color',   sanitize_hex_color($_POST['bsq_primary_color']    ?? '#2d6a5a') ?: '#2d6a5a');
         foreach (array_keys(bsq_custom_field_list()) as $key) {
             update_option('bsq_cf_' . $key, sanitize_text_field($_POST['bsq_cf_' . $key] ?? ''));
         }
@@ -69,6 +81,7 @@ function bsq_render_settings() {
     $api_key     = get_option('bsq_ghl_api_key',     '');
     $location_id = get_option('bsq_ghl_location_id', '');
     $booking_url = get_option('bsq_booking_url',     '/booking-method');
+    $primary     = get_option('bsq_primary_color',   '#2d6a5a');
 
     // Group fields for display
     $groups = [];
@@ -113,6 +126,22 @@ function bsq_render_settings() {
                         Copy
                     </button>
                 </div>
+            </div>
+
+            <!-- ── Appearance ── -->
+            <div class="bsq-card">
+                <p class="bsq-card-title">Appearance</p>
+                <table class="form-table" style="margin-top:0">
+                    <tr>
+                        <th style="width:180px"><label for="bsq_primary_color">Primary Colour</label></th>
+                        <td>
+                            <input type="color" id="bsq_primary_color" name="bsq_primary_color"
+                                   value="<?php echo esc_attr($primary); ?>"
+                                   style="height:38px;width:60px;cursor:pointer;border:1px solid #e2e8f0;border-radius:6px;padding:2px" />
+                            <span style="margin-left:8px;font-size:13px;color:#475569">Used for the header, buttons, progress bar, and active selections.</span>
+                        </td>
+                    </tr>
+                </table>
             </div>
 
             <!-- ── GHL Connection ── -->
@@ -213,7 +242,9 @@ add_shortcode('berlin_questionnaire', function () {
         'nonce'       => wp_create_nonce('bsq_submit'),
         'booking_url' => get_option('bsq_booking_url', '/booking-method'),
     ]);
+    $primary = get_option('bsq_primary_color', '#2d6a5a');
     ob_start();
+    echo '<style>#bsq-wrap{' . bsq_primary_css($primary) . '}</style>';
     include BSQ_DIR . 'templates/questionnaire.php';
     return ob_get_clean();
 });

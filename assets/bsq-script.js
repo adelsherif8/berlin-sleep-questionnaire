@@ -2,8 +2,9 @@
 (function () {
   'use strict';
 
-  var TOTAL_STEPS = 5;
-  var currentStep = 1;
+  var TOTAL_STEPS  = 5;
+  var currentStep  = 1;
+  var bsqLoadedAt  = Date.now(); // used for minimum-time bot check
 
   /* ── DOM refs ── */
   var wrap         = document.getElementById('bsq-wrap');
@@ -112,7 +113,7 @@
       }
       var q5 = wrap.querySelector('[name="q5"]:checked');
       var q6 = wrap.querySelector('[name="q6"]:checked');
-      if (!q5) errors.push('Please answer whether your snoring bothers others.');
+      if (q2 && q2.value === 'yes' && !q5) errors.push('Please answer whether your snoring bothers others.');
       if (!q6) errors.push('Please answer the breathing question.');
     }
 
@@ -281,6 +282,11 @@
     var formData = new FormData();
     formData.append('action', 'bsq_submit');
     formData.append('nonce', BSQ.nonce);
+    // Time elapsed since page load (seconds) — used server-side for bot check
+    formData.append('data[_elapsed]', String(Math.floor((Date.now() - bsqLoadedAt) / 1000)));
+    // Honeypot value — should always be empty
+    var hp = document.querySelector('[name="website"]');
+    formData.append('data[_hp]', hp ? hp.value : '');
     Object.keys(data).forEach(function (k) { formData.append('data[' + k + ']', data[k]); });
 
     fetch(BSQ.ajax_url, { method: 'POST', body: formData }).catch(function () {});
