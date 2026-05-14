@@ -1,0 +1,63 @@
+name: Release Plugin
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read plugin version
+        id: ver
+        run: |
+          VERSION=$(grep "^\s*\*\s*Version:" berlin-questionnaire.php | sed 's/.*Version:[[:space:]]*//' | tr -d '[:space:]')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Detected version: $VERSION"
+
+      - name: Check if release already exists for this version
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "v${{ steps.ver.outputs.version }}" --repo ${{ github.repository }} > /dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Release v${{ steps.ver.outputs.version }} already exists — skipping."
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "New version — creating release v${{ steps.ver.outputs.version }}"
+          fi
+
+      - name: Build plugin zip
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          mkdir -p /tmp/build/berlin-questionnaire
+          rsync -av \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='dist' \
+            . /tmp/build/berlin-questionnaire/
+          cd /tmp/build
+          zip -r berlin-questionnaire.zip berlin-questionnaire/
+          mv berlin-questionnaire.zip $GITHUB_WORKSPACE/
+
+      - name: Create GitHub Release
+        if: steps.check.outputs.exists == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          name: v${{ steps.ver.outputs.version }}
+          body: |
+            Berlin Sleep Apnea Questionnaire v${{ steps.ver.outputs.version }}
+
+            Install or update by uploading `berlin-questionnaire.zip` to WordPress → Plugins → Add New → Upload.
+            WordPress sites with this plugin installed will auto-update within 12 hours.
+          files: berlin-questionnaire.zip
+          token: ${{ secrets.GITHUB_TOKEN }}
