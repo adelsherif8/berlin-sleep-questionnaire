@@ -3,7 +3,10 @@
  * Plugin Name: Berlin Sleep Apnea Questionnaire
  * Description: Multi-step Berlin Questionnaire with scoring, results, and GoHighLevel webhook integration.
  * Version:     1.0.0
- * Author:      Riverwalk Dentistry
+ * Plugin URI:  https://upwork.com/freelancers/adelsherif8
+ * Author:      Adel Emad
+ * Author URI:  https://upwork.com/freelancers/adelsherif8
+ * License:     GPL-2.0+
  * GitHub Plugin URI: adelsherif8/berlin-sleep-questionnaire
  */
 
