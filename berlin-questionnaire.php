@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Berlin Sleep Apnea Questionnaire
  * Description: Multi-step Berlin Questionnaire with scoring, results, and GoHighLevel webhook integration.
- * Version:     1.0.3
+ * Version:     1.0.4
  * Plugin URI:  https://upwork.com/freelancers/adelsherif8
  * Author:      Adel Emad
  * Author URI:  https://upwork.com/freelancers/adelsherif8
@@ -12,7 +12,7 @@
 
 defined('ABSPATH') || exit;
 
-define('BSQ_VERSION', '1.0.3');
+define('BSQ_VERSION', '1.0.4');
 define('BSQ_DIR',     plugin_dir_path(__FILE__));
 define('BSQ_URL',     plugin_dir_url(__FILE__));
 
@@ -228,6 +228,50 @@ function bsq_render_settings() {
 
             <?php submit_button('Save Settings', 'primary large'); ?>
         </form>
+
+        <!-- ── Force Update Check ── -->
+        <div class="bsq-card" style="margin-top:22px">
+            <p class="bsq-card-title">Plugin Updates</p>
+            <p style="margin:0 0 14px;color:#475569;font-size:13px">
+                WordPress caches update data for up to 12 hours. If you just pushed a new release to GitHub and it isn't showing in
+                <strong>Dashboard → Updates</strong>, click below to clear the cache and force an immediate re-check.
+            </p>
+            <button type="button" id="bsq-force-update-btn" class="button button-secondary">
+                Force Update Check
+            </button>
+            <span id="bsq-force-update-msg" style="margin-left:12px;font-size:13px;color:#475569"></span>
+        </div>
+        <script>
+        document.getElementById('bsq-force-update-btn').addEventListener('click', function () {
+            var btn = this;
+            var msg = document.getElementById('bsq-force-update-msg');
+            btn.disabled = true;
+            btn.textContent = 'Checking…';
+            msg.textContent = '';
+            var fd = new FormData();
+            fd.append('action', 'bsq_force_update_check');
+            fd.append('nonce', '<?php echo esc_js(wp_create_nonce('bsq_force_update')); ?>');
+            fetch(ajaxurl, { method: 'POST', body: fd })
+                .then(function (r) { return r.json(); })
+                .then(function (res) {
+                    btn.disabled = false;
+                    btn.textContent = 'Force Update Check';
+                    if (res.success) {
+                        msg.style.color = '#166534';
+                        msg.textContent = res.data.message;
+                    } else {
+                        msg.style.color = '#991b1b';
+                        msg.textContent = 'Error — try again.';
+                    }
+                })
+                .catch(function () {
+                    btn.disabled = false;
+                    btn.textContent = 'Force Update Check';
+                    msg.style.color = '#991b1b';
+                    msg.textContent = 'Request failed.';
+                });
+        });
+        </script>
     </div>
     <?php
 }
@@ -384,6 +428,18 @@ function bsq_send_ghl(array $d, array $score): void {
         'blocking' => false,
     ]);
 }
+
+/* ─── Force Update Check AJAX ────────────────────────── */
+
+add_action('wp_ajax_bsq_force_update_check', function () {
+    check_ajax_referer('bsq_force_update', 'nonce');
+    if (!current_user_can('manage_options')) wp_send_json_error();
+
+    delete_transient('bsq_github_release');
+    delete_site_transient('update_plugins');
+
+    wp_send_json_success(['message' => 'Cache cleared. Go to Dashboard → Updates and click "Check Again" to see the latest version.']);
+});
 
 /* ─── GitHub Auto-Updater ─────────────────────────────── */
 
