@@ -28,40 +28,176 @@ add_action('admin_menu', function () {
     );
 });
 
+function bsq_custom_field_list(): array {
+    return [
+        // Demographics
+        'age'            => ['label' => 'Age',                      'example' => '45',                    'group' => 'Demographics'],
+        'gender'         => ['label' => 'Gender',                   'example' => 'male / female',          'group' => 'Demographics'],
+        'height'         => ['label' => 'Height',                   'example' => "5'10\"",                 'group' => 'Demographics'],
+        'weight'         => ['label' => 'Weight (lbs)',             'example' => '185',                   'group' => 'Demographics'],
+        'bmi'            => ['label' => 'BMI',                      'example' => '26.4',                  'group' => 'Demographics'],
+        // Berlin Answers
+        'q2'             => ['label' => 'Q2 — Snores?',             'example' => 'yes / no / dont_know',  'group' => 'Berlin Answers'],
+        'q3'             => ['label' => 'Q3 — Snoring volume',      'example' => 'very_loud',             'group' => 'Berlin Answers'],
+        'q4'             => ['label' => 'Q4 — Snoring frequency',   'example' => 'nearly_every_day',      'group' => 'Berlin Answers'],
+        'q5'             => ['label' => 'Q5 — Bothers others?',     'example' => 'yes / no',              'group' => 'Berlin Answers'],
+        'q6'             => ['label' => 'Q6 — Stop breathing?',     'example' => 'nearly_every_day',      'group' => 'Berlin Answers'],
+        'q7'             => ['label' => 'Q7 — Tired after sleep',   'example' => '3_4_times',             'group' => 'Berlin Answers'],
+        'q8'             => ['label' => 'Q8 — Tired during day',    'example' => 'nearly_every_day',      'group' => 'Berlin Answers'],
+        'q9'             => ['label' => 'Q9 — Fall asleep driving?','example' => 'yes / no',              'group' => 'Berlin Answers'],
+        'q10'            => ['label' => 'Q10 — Blood pressure?',    'example' => 'yes / no / dont_know',  'group' => 'Berlin Answers'],
+        // Score
+        'risk_level'     => ['label' => 'Risk Level',               'example' => 'High Risk / Low Risk',  'group' => 'Score'],
+        'pos_categories' => ['label' => 'Positive Categories (0–3)','example' => '2',                     'group' => 'Score'],
+        'cat1_positive'  => ['label' => 'Category 1 Positive',      'example' => 'Yes / No',              'group' => 'Score'],
+        'cat2_positive'  => ['label' => 'Category 2 Positive',      'example' => 'Yes / No',              'group' => 'Score'],
+        'cat3_positive'  => ['label' => 'Category 3 Positive',      'example' => 'Yes / No',              'group' => 'Score'],
+    ];
+}
+
 function bsq_render_settings() {
     if (isset($_POST['bsq_nonce']) && wp_verify_nonce($_POST['bsq_nonce'], 'bsq_save')) {
-        update_option('bsq_ghl_webhook', esc_url_raw($_POST['bsq_ghl_webhook'] ?? ''));
-        update_option('bsq_booking_url', sanitize_text_field($_POST['bsq_booking_url'] ?? '/booking-method'));
-        echo '<div class="notice notice-success"><p>Settings saved.</p></div>';
+        update_option('bsq_ghl_api_key',     sanitize_text_field($_POST['bsq_ghl_api_key']     ?? ''));
+        update_option('bsq_ghl_location_id', sanitize_text_field($_POST['bsq_ghl_location_id'] ?? ''));
+        update_option('bsq_booking_url',     sanitize_text_field($_POST['bsq_booking_url']     ?? '/booking-method'));
+        foreach (array_keys(bsq_custom_field_list()) as $key) {
+            update_option('bsq_cf_' . $key, sanitize_text_field($_POST['bsq_cf_' . $key] ?? ''));
+        }
+        echo '<div class="notice notice-success is-dismissible"><p><strong>Settings saved.</strong></p></div>';
     }
-    $webhook     = get_option('bsq_ghl_webhook', '');
-    $booking_url = get_option('bsq_booking_url', '/booking-method');
+
+    $api_key     = get_option('bsq_ghl_api_key',     '');
+    $location_id = get_option('bsq_ghl_location_id', '');
+    $booking_url = get_option('bsq_booking_url',     '/booking-method');
+
+    // Group fields for display
+    $groups = [];
+    foreach (bsq_custom_field_list() as $key => $meta) {
+        $groups[$meta['group']][$key] = $meta;
+    }
     ?>
-    <div class="wrap">
-        <h1>Sleep Questionnaire Settings</h1>
+    <style>
+        .bsq-wrap       { max-width:900px; margin-top:20px; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+        .bsq-card       { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:24px 28px; margin-bottom:22px; box-shadow:0 1px 3px rgba(0,0,0,.04); }
+        .bsq-card-title { margin:0 0 4px; font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:#64748b; padding-bottom:14px; border-bottom:1px solid #f1f5f9; }
+        .bsq-sc-row     { display:flex; align-items:center; gap:12px; background:#f8fafb; border:1px solid #e2e8f0; border-radius:7px; padding:13px 16px; font-family:monospace; font-size:15px; font-weight:700; color:#2d6a5a; }
+        .bsq-sc-row button { flex-shrink:0; }
+        .bsq-ft         { width:100%; border-collapse:collapse; margin-top:16px; }
+        .bsq-ft th      { text-align:left; padding:7px 12px; background:#f8fafb; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#64748b; border-bottom:2px solid #e2e8f0; }
+        .bsq-ft td      { padding:8px 12px; border-bottom:1px solid #f1f5f9; vertical-align:middle; font-size:13px; }
+        .bsq-ft td:first-child { width:260px; font-weight:500; color:#1e293b; }
+        .bsq-ft td code { background:#f1f5f9; padding:2px 7px; border-radius:4px; font-size:11px; color:#475569; }
+        .bsq-ft input   { width:100%; max-width:320px; }
+        .bsq-group-row td { background:#f8fafb; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:#94a3b8; padding:6px 12px; border-bottom:1px solid #e2e8f0; }
+        .bsq-auto-tag   { display:inline-block; background:#dcfce7; color:#166534; font-size:10px; font-weight:700; padding:2px 7px; border-radius:99px; margin-left:6px; text-transform:uppercase; letter-spacing:.04em; }
+    </style>
+
+    <div class="bsq-wrap">
+        <h1 style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+            <span style="background:#2d6a5a;color:#fff;width:34px;height:34px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🔬</span>
+            Berlin Sleep Questionnaire
+        </h1>
+        <p style="color:#64748b;margin:0 0 22px">Configure the questionnaire, GHL connection, and custom field mapping.</p>
+
         <form method="post">
             <?php wp_nonce_field('bsq_save', 'bsq_nonce'); ?>
-            <table class="form-table">
-                <tr>
-                    <th><label for="bsq_ghl_webhook">GHL Webhook URL</label></th>
-                    <td>
-                        <input type="url" id="bsq_ghl_webhook" name="bsq_ghl_webhook"
-                               value="<?php echo esc_attr($webhook); ?>" class="regular-text"
-                               placeholder="https://services.leadconnectorhq.com/hooks/..." />
-                        <p class="description">GoHighLevel workflow webhook — receives all answers + score.</p>
-                    </td>
-                </tr>
-                <tr>
-                    <th><label for="bsq_booking_url">Booking Page URL</label></th>
-                    <td>
-                        <input type="text" id="bsq_booking_url" name="bsq_booking_url"
-                               value="<?php echo esc_attr($booking_url); ?>" class="regular-text"
-                               placeholder="/booking-method" />
-                        <p class="description">URL the "Book Appointment" button links to on the results screen.</p>
-                    </td>
-                </tr>
-            </table>
-            <?php submit_button('Save Settings'); ?>
+
+            <!-- ── Shortcode ── -->
+            <div class="bsq-card">
+                <p class="bsq-card-title">Shortcode</p>
+                <p style="margin:0 0 10px;color:#475569;font-size:13px">Paste this into any Page or Post where you want the questionnaire to appear.</p>
+                <div class="bsq-sc-row">
+                    <span>[berlin_questionnaire]</span>
+                    <button type="button" class="button"
+                            onclick="navigator.clipboard.writeText('[berlin_questionnaire]');this.textContent='Copied ✓';setTimeout(()=>this.textContent='Copy',2000)">
+                        Copy
+                    </button>
+                </div>
+            </div>
+
+            <!-- ── GHL Connection ── -->
+            <div class="bsq-card">
+                <p class="bsq-card-title">GoHighLevel Connection</p>
+                <table class="form-table" style="margin-top:0">
+                    <tr>
+                        <th style="width:180px"><label for="bsq_ghl_api_key">API Key</label></th>
+                        <td>
+                            <input type="password" id="bsq_ghl_api_key" name="bsq_ghl_api_key"
+                                   value="<?php echo esc_attr($api_key); ?>" class="regular-text"
+                                   placeholder="eyJ…" autocomplete="off" />
+                            <p class="description">GHL → Settings → Private Integrations → Create Key &rarr; enable <strong>Contacts: Read + Write</strong></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="bsq_ghl_location_id">Location ID</label></th>
+                        <td>
+                            <input type="text" id="bsq_ghl_location_id" name="bsq_ghl_location_id"
+                                   value="<?php echo esc_attr($location_id); ?>" class="regular-text"
+                                   placeholder="xxxxxxxxxxxxxxxxxxxxxxxx" />
+                            <p class="description">GHL → Settings → Business Info → Location ID</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th><label for="bsq_booking_url">Booking Page URL</label></th>
+                        <td>
+                            <input type="text" id="bsq_booking_url" name="bsq_booking_url"
+                                   value="<?php echo esc_attr($booking_url); ?>" class="regular-text"
+                                   placeholder="/booking-method" />
+                            <p class="description">The "Book Appointment" button on the results screen links here.</p>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- ── Fields sent to GHL ── -->
+            <div class="bsq-card">
+                <p class="bsq-card-title">GHL Custom Field IDs</p>
+                <p style="margin:0;color:#475569;font-size:13px">
+                    Fields marked <span class="bsq-auto-tag">Auto</span> are mapped automatically (Name, Email, Phone, Source, Tags).
+                    For the rest, create a matching Custom Field in GHL (Settings → Custom Fields) and paste its <strong>Field ID</strong> into the right column.
+                    Leave blank to skip that field.
+                </p>
+
+                <!-- Auto-mapped fields (read-only info) -->
+                <table class="bsq-ft" style="margin-top:18px">
+                    <thead>
+                        <tr><th>Field</th><th>Value sent</th><th>Mapping</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>First Name</td><td><code>From full name</code></td><td><span class="bsq-auto-tag">Auto</span></td></tr>
+                        <tr><td>Last Name</td><td><code>From full name</code></td><td><span class="bsq-auto-tag">Auto</span></td></tr>
+                        <tr><td>Email</td><td><code>patient email</code></td><td><span class="bsq-auto-tag">Auto</span></td></tr>
+                        <tr><td>Phone</td><td><code>patient phone</code></td><td><span class="bsq-auto-tag">Auto</span></td></tr>
+                        <tr><td>Source</td><td><code>Berlin Sleep Questionnaire</code></td><td><span class="bsq-auto-tag">Auto</span></td></tr>
+                        <tr><td>Tags</td><td><code>sleep-apnea-screening, berlin-high-risk / berlin-low-risk</code></td><td><span class="bsq-auto-tag">Auto</span></td></tr>
+                    </tbody>
+                </table>
+
+                <!-- Custom field mapping per group -->
+                <?php foreach ($groups as $group_name => $fields): ?>
+                <table class="bsq-ft" style="margin-top:16px">
+                    <thead>
+                        <tr><th colspan="3"><?php echo esc_html($group_name); ?></th></tr>
+                        <tr><th>Field</th><th>Example value</th><th>GHL Custom Field ID</th></tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($fields as $key => $meta): ?>
+                        <tr>
+                            <td><?php echo esc_html($meta['label']); ?></td>
+                            <td><code><?php echo esc_html($meta['example']); ?></code></td>
+                            <td>
+                                <input type="text" name="bsq_cf_<?php echo esc_attr($key); ?>"
+                                       value="<?php echo esc_attr(get_option('bsq_cf_' . $key, '')); ?>"
+                                       placeholder="Paste GHL field ID…" />
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+                <?php endforeach; ?>
+            </div>
+
+            <?php submit_button('Save Settings', 'primary large'); ?>
         </form>
     </div>
     <?php
@@ -95,9 +231,8 @@ function bsq_handle_submit() {
 
     $score = bsq_score($d);
 
-    $webhook = get_option('bsq_ghl_webhook', '');
-    if ($webhook) {
-        bsq_send_ghl($webhook, $d, $score);
+    if (get_option('bsq_ghl_api_key') && get_option('bsq_ghl_location_id')) {
+        bsq_send_ghl($d, $score);
     }
 
     wp_send_json_success($score);
@@ -145,53 +280,73 @@ function bsq_score(array $d): array {
     ];
 }
 
-/* ─── GHL Webhook ─────────────────────────────────────── */
+/* ─── GHL API ─────────────────────────────────────────── */
 
-function bsq_send_ghl(string $webhook, array $d, array $score): void {
+function bsq_send_ghl(array $d, array $score): void {
+    $api_key     = get_option('bsq_ghl_api_key',     '');
+    $location_id = get_option('bsq_ghl_location_id', '');
+    if (!$api_key || !$location_id) return;
+
     $parts = explode(' ', trim($d['full_name'] ?? ''), 2);
 
+    // Values for each custom field key
+    $field_values = [
+        'age'            => $d['age']              ?? '',
+        'gender'         => $d['gender']           ?? '',
+        'height'         => $d['height_display']   ?? '',
+        'weight'         => $d['weight_lbs']       ?? '',
+        'bmi'            => (string) $score['bmi'],
+        'q2'             => $d['q2']  ?? '',
+        'q3'             => $d['q3']  ?? '',
+        'q4'             => $d['q4']  ?? '',
+        'q5'             => $d['q5']  ?? '',
+        'q6'             => $d['q6']  ?? '',
+        'q7'             => $d['q7']  ?? '',
+        'q8'             => $d['q8']  ?? '',
+        'q9'             => $d['q9']  ?? '',
+        'q10'            => $d['q10'] ?? '',
+        'risk_level'     => $score['risk_level'],
+        'pos_categories' => (string) $score['pos_categories'],
+        'cat1_positive'  => $score['cat1_positive'] ? 'Yes' : 'No',
+        'cat2_positive'  => $score['cat2_positive'] ? 'Yes' : 'No',
+        'cat3_positive'  => $score['cat3_positive'] ? 'Yes' : 'No',
+    ];
+
+    // Build customFields array — only include fields that have an ID configured
+    $custom_fields = [];
+    foreach ($field_values as $key => $value) {
+        $field_id = get_option('bsq_cf_' . $key, '');
+        if ($field_id && $value !== '') {
+            $custom_fields[] = ['id' => $field_id, 'field_value' => $value];
+        }
+    }
+
     $payload = [
-        // Contact
-        'firstName'                  => $parts[0] ?? '',
-        'lastName'                   => $parts[1] ?? '',
-        'email'                      => $d['email']    ?? '',
-        'phone'                      => $d['phone']    ?? '',
-        // Demographics
-        'age'                        => $d['age']      ?? '',
-        'gender'                     => $d['gender']   ?? '',
-        'height'                     => $d['height_display'] ?? '',
-        'weight_lbs'                 => $d['weight_lbs'] ?? '',
-        'bmi'                        => $score['bmi'],
-        // Berlin answers
-        'berlin_q2_snore'            => $d['q2'] ?? '',
-        'berlin_q3_snore_volume'     => $d['q3'] ?? '',
-        'berlin_q4_snore_frequency'  => $d['q4'] ?? '',
-        'berlin_q5_bothers_others'   => $d['q5'] ?? '',
-        'berlin_q6_stop_breathing'   => $d['q6'] ?? '',
-        'berlin_q7_tired_after_sleep'=> $d['q7'] ?? '',
-        'berlin_q8_tired_during_day' => $d['q8'] ?? '',
-        'berlin_q9_fall_asleep_driving' => $d['q9'] ?? '',
-        'berlin_q10_blood_pressure'  => $d['q10'] ?? '',
-        // Score
-        'berlin_cat1_score'          => $score['cat1_score'],
-        'berlin_cat1_positive'       => $score['cat1_positive'] ? 'Yes' : 'No',
-        'berlin_cat2_score'          => $score['cat2_score'],
-        'berlin_cat2_positive'       => $score['cat2_positive'] ? 'Yes' : 'No',
-        'berlin_cat3_positive'       => $score['cat3_positive'] ? 'Yes' : 'No',
-        'berlin_risk_level'          => $score['risk_level'],
-        'berlin_positive_categories' => $score['pos_categories'],
-        'source'                     => 'Berlin Sleep Questionnaire',
-        'tags'                       => [
+        'firstName'    => $parts[0] ?? '',
+        'lastName'     => $parts[1] ?? '',
+        'email'        => $d['email'] ?? '',
+        'phone'        => $d['phone'] ?? '',
+        'locationId'   => $location_id,
+        'source'       => 'Berlin Sleep Questionnaire',
+        'tags'         => [
             'sleep-apnea-screening',
             $score['risk_level'] === 'High Risk' ? 'berlin-high-risk' : 'berlin-low-risk',
         ],
     ];
 
-    wp_remote_post($webhook, [
-        'headers' => ['Content-Type' => 'application/json'],
-        'body'    => wp_json_encode($payload),
-        'timeout' => 15,
-        'blocking'=> false,
+    if (!empty($custom_fields)) {
+        $payload['customFields'] = $custom_fields;
+    }
+
+    wp_remote_post('https://services.leadconnectorhq.com/contacts/', [
+        'headers' => [
+            'Authorization' => 'Bearer ' . $api_key,
+            'Version'       => '2021-07-28',
+            'Content-Type'  => 'application/json',
+        ],
+        'body'     => wp_json_encode($payload),
+        'timeout'  => 15,
+        'blocking' => false,
     ]);
 }
 
