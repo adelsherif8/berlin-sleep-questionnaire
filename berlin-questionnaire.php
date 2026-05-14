@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Berlin Sleep Apnea Questionnaire
  * Description: Multi-step Berlin Questionnaire with scoring, results, and GoHighLevel webhook integration.
- * Version:     1.0.0
+ * Version:     1.0.1
  * Plugin URI:  https://upwork.com/freelancers/adelsherif8
  * Author:      Adel Emad
  * Author URI:  https://upwork.com/freelancers/adelsherif8
@@ -12,7 +12,7 @@
 
 defined('ABSPATH') || exit;
 
-define('BSQ_VERSION', '1.0.0');
+define('BSQ_VERSION', '1.0.1');
 define('BSQ_DIR',     plugin_dir_path(__FILE__));
 define('BSQ_URL',     plugin_dir_url(__FILE__));
 
@@ -228,6 +228,10 @@ function bsq_handle_submit() {
 
     $raw = isset($_POST['data']) && is_array($_POST['data']) ? $_POST['data'] : [];
     $d   = array_map('sanitize_text_field', $raw);
+
+    // Bot protection: honeypot filled → silently drop; submitted too fast → silently drop
+    if (!empty($d['_hp'])) { wp_send_json_success([]); return; }
+    if (intval($d['_elapsed'] ?? 0) < 8) { wp_send_json_success([]); return; }
 
     $score = bsq_score($d);
 
